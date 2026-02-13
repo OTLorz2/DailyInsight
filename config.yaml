@@ -1,0 +1,23 @@
+# Insight-mode config
+# Data sources (current: arxiv only)
+sources:
+  arxiv:
+    enabled: true
+    categories: ["cs.AI", "cs.LG", "cs.CL"]
+    max_results: 30
+
+# Storage
+storage:
+  path: data/insight.db
+
+# Analyzer
+analyzer:
+  model: qwen3:8b
+  max_items_per_run: 30
+  summary_max_chars: 5000
+
+# Delivery plugins (current: email only)
+delivery:
+  plugins: [email]
+  email:
+    subject_prefix: "[AI 洞察]"

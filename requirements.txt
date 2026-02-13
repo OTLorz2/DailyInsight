@@ -1,0 +1,17 @@
+# Fetch
+requests>=2.28.0
+feedparser>=6.0.0
+certifi>=2023.0.0
+
+# Storage
+# sqlite3 is stdlib
+
+# LLM (openai-compatible)
+openai>=1.0.0
+
+# Email
+# smtplib is stdlib
+
+# Config
+pyyaml>=6.0.0
+python-dotenv>=1.0.0
