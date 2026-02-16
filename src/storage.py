@@ -1,7 +1,7 @@
 """
 Storage layer: RawStore (raw items) and InsightStore (analyzed insights).
-Data contract per plan: raw items have id, title, url, summary, source, fetched_at;
-insights have id, raw_item_id, opportunities, directions, innovations, analyzed_at.
+Raw items: id, title, url, summary, source, fetched_at.
+Insights: id, raw_item_id, data (JSON blob, structure flexible), analyzed_at.
 """
 import json
 import os
@@ -25,12 +25,10 @@ class RawItem:
 
 @dataclass
 class Insight:
-    """Analyzed insight linked to a raw item."""
+    """Analyzed insight linked to a raw item. data is arbitrary JSON from the analyzer."""
     id: int | None
     raw_item_id: int
-    opportunities: list[str]
-    directions: list[str]
-    innovations: list[str]
+    data: dict[str, Any]
     analyzed_at: str  # ISO format
 
 
@@ -137,9 +135,7 @@ INSIGHT_TABLE = """
 CREATE TABLE IF NOT EXISTS insights (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     raw_item_id INTEGER NOT NULL,
-    opportunities TEXT NOT NULL,
-    directions TEXT NOT NULL,
-    innovations TEXT NOT NULL,
+    data TEXT NOT NULL,
     analyzed_at TEXT NOT NULL,
     FOREIGN KEY (raw_item_id) REFERENCES raw_items(id)
 )
@@ -147,7 +143,7 @@ CREATE TABLE IF NOT EXISTS insights (
 
 
 class InsightStore:
-    """Persists analyzed insights. opportunities/directions/innovations stored as JSON arrays."""
+    """Persists analyzed insights. data is a flexible JSON object from the analyzer."""
 
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -155,24 +151,12 @@ class InsightStore:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(INSIGHT_TABLE)
 
-    def insert(
-        self,
-        raw_item_id: int,
-        opportunities: list[str],
-        directions: list[str],
-        innovations: list[str],
-    ) -> int:
+    def insert(self, raw_item_id: int, data: dict[str, Any]) -> int:
         analyzed_at = datetime.utcnow().isoformat() + "Z"
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.execute(
-                "INSERT INTO insights (raw_item_id, opportunities, directions, innovations, analyzed_at) VALUES (?, ?, ?, ?, ?)",
-                (
-                    raw_item_id,
-                    json.dumps(opportunities, ensure_ascii=False),
-                    json.dumps(directions, ensure_ascii=False),
-                    json.dumps(innovations, ensure_ascii=False),
-                    analyzed_at,
-                ),
+                "INSERT INTO insights (raw_item_id, data, analyzed_at) VALUES (?, ?, ?)",
+                (raw_item_id, json.dumps(data, ensure_ascii=False), analyzed_at),
             )
             conn.commit()
             return cur.lastrowid
@@ -192,9 +176,7 @@ class InsightStore:
             return Insight(
                 id=row["id"],
                 raw_item_id=row["raw_item_id"],
-                opportunities=json.loads(row["opportunities"]),
-                directions=json.loads(row["directions"]),
-                innovations=json.loads(row["innovations"]),
+                data=json.loads(row["data"]),
                 analyzed_at=row["analyzed_at"],
             )
 
@@ -215,9 +197,7 @@ class InsightStore:
                 Insight(
                     id=r["id"],
                     raw_item_id=r["raw_item_id"],
-                    opportunities=json.loads(r["opportunities"]),
-                    directions=json.loads(r["directions"]),
-                    innovations=json.loads(r["innovations"]),
+                    data=json.loads(r["data"]),
                     analyzed_at=r["analyzed_at"],
                 )
                 for r in rows

@@ -15,25 +15,41 @@ from src.storage import RawStore, InsightStore
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an expert analyst. For each AI-related paper or news item, extract:
-1. **商业机会 (opportunities)**: 1-3 short phrases on productization, ToB/ToC, or industry applications.
-2. **技术方向 (directions)**: 1-3 short phrases on new methods, architectures, benchmarks, or datasets.
-3. **创新点 (innovations)**: 1-3 short phrases on breakthroughs or reusable ideas vs existing work.
+SYSTEM_PROMPT = """你是一名专业分析师。请根据每条信息的类型采用自适应的分析流程，根据内容自行组织输出结构。
 
-Respond ONLY with a single JSON object of the form:
-{"opportunities": ["...", "..."], "directions": ["...", "..."], "innovations": ["...", "..."]}
-Use empty lists if nothing relevant. Keep each string concise (under 80 chars)."""
+## 分析流程示例
+
+**若为学术论文：**
+1. 先简要总结论文内容与核心贡献；
+2. 描述论文创新点（方法、实验或理论上的突破）；
+3. 分析可能的改进策略或技术演进方向；
+4. 分析商业落地可能性以及可行的商业计划或应用场景。
+用你认为合适的中文键名组织成 JSON（如：总结、创新点、改进方向、商业计划 等）。
+
+**若为新闻或资讯：**
+1. 先总结新闻要点；
+2. 突出值得关注的重点（政策、产品、融资、人事等）；
+3. 描述潜在重要信息（如市场预测、行业动向、大众舆情、竞争格局等）。
+用你认为合适的中文键名组织成 JSON（如：总结、重点、市场预测 等）。
+
+**若为其他类型（博客、报告、产品发布等）：**
+先总结内容，再分析关键信息与潜在影响，用合适的中文键名组织成 JSON。
+
+## 输出要求
+
+请仅回复一个 JSON 对象，键名使用中文，键和结构由你根据分析内容自行决定。值可以是字符串、字符串数组或嵌套对象。每条描述保持简洁（建议 80 字符以内）。"""
 
 
-def _parse_llm_response(text: str) -> dict[str, list[str]]:
-    """Extract JSON from model response (may be wrapped in markdown)."""
+def _parse_llm_response(text: str) -> dict[str, Any]:
+    """Extract JSON from model response (may be wrapped in markdown). Returns dict with arbitrary structure."""
     text = text.strip()
-    # Strip markdown code block if present
     if "```" in text:
         parts = text.split("```")
         for p in parts:
-            if "{" in p and "opportunities" in p:
+            if "{" in p:
                 text = p.strip()
+                if text.startswith("json"):
+                    text = text[4:].strip()
                 break
     start = text.find("{")
     if start >= 0:
@@ -51,7 +67,7 @@ def _parse_llm_response(text: str) -> dict[str, list[str]]:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        return {"opportunities": [], "directions": [], "innovations": []}
+        return {}
 
 
 def analyze_one(
@@ -61,8 +77,8 @@ def analyze_one(
     url: str,
     summary: str,
     summary_max_chars: int = 500,
-) -> tuple[list[str], list[str], list[str]]:
-    """Call LLM for one raw item; return (opportunities, directions, innovations)."""
+) -> dict[str, Any]:
+    """Call LLM for one raw item; return analysis as a dict (structure determined by model)."""
     summary_trim = (summary or "")[:summary_max_chars]
     user = f"Title: {title}\nURL: {url}\nAbstract/Summary: {summary_trim}"
     resp = client.chat.completions.create(
@@ -74,12 +90,7 @@ def analyze_one(
         temperature=0.3,
     )
     content = (resp.choices[0].message.content or "").strip()
-    out = _parse_llm_response(content)
-    return (
-        out.get("opportunities") or [],
-        out.get("directions") or [],
-        out.get("innovations") or [],
-    )
+    return _parse_llm_response(content)
 
 
 def run_analyze(
@@ -107,10 +118,10 @@ def run_analyze(
     count = 0
     for item in to_process:
         try:
-            opps, dirs, inns = analyze_one(
+            data = analyze_one(
                 client, model, item.title, item.url, item.summary, summary_max_chars
             )
-            insight_store.insert(item.id, opps, dirs, inns)
+            insight_store.insert(item.id, data)
             count += 1
             logger.info("Analyzed raw_item_id=%s", item.id)
         except Exception as e:

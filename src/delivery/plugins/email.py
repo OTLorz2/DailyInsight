@@ -23,14 +23,26 @@ def _parse_recipients(raw: str | list[str] | None) -> list[str]:
     return [s.strip() for s in str(raw).split(",") if s.strip()]
 
 
+def _format_value(v: Any) -> str:
+    """Format a single value for email: list -> join, str -> as is, dict -> one line summary."""
+    if isinstance(v, list):
+        return ", ".join(str(x) for x in v) if v else "-"
+    if isinstance(v, str):
+        return v or "-"
+    if isinstance(v, dict):
+        return "; ".join(f"{k}: {_format_value(val)}" for k, val in v.items()) or "-"
+    return str(v) if v is not None else "-"
+
+
 def _build_body(insights: list[Any], raw_store: Any | None = None) -> str:
-    """Build plain text email body from insights."""
+    """Build plain text email body from insights (flexible data structure)."""
     lines = ["# AI 洞察 日报\n"]
     for i, ins in enumerate(insights, 1):
         lines.append(f"## 条目 {i}\n")
-        lines.append("- **商业机会**: " + ", ".join(ins.opportunities or ["-"]) + "\n")
-        lines.append("- **技术方向**: " + ", ".join(ins.directions or ["-"]) + "\n")
-        lines.append("- **创新点**: " + ", ".join(ins.innovations or ["-"]) + "\n")
+        data = getattr(ins, "data", {}) or {}
+        for key, value in data.items():
+            label = key.replace("_", " ").strip()
+            lines.append(f"- **{label}**: {_format_value(value)}\n")
         if raw_store and getattr(ins, "raw_item_id", None):
             raw = raw_store.get_by_id(ins.raw_item_id)
             if raw:

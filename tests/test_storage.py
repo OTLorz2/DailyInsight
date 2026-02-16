@@ -9,6 +9,11 @@ from src.storage import RawStore, InsightStore, RawItem, Insight
 def test_raw_store():
     path = os.path.join(os.path.dirname(__file__), "..", "data", "_test_raw.db")
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
     try:
         store = RawStore(path)
         id1 = store.insert("Title A", "https://a.org/1", "Summary A", "arxiv")
@@ -32,12 +37,18 @@ def test_raw_store():
 def test_insight_store():
     path = os.path.join(os.path.dirname(__file__), "..", "data", "_test_insight.db")
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
     try:
         store = InsightStore(path)
-        pk = store.insert(1, ["opp1"], ["dir1"], ["inn1"])
+        data = {"summary": "简要总结", "innovations": ["创新1"], "commercial_plan": ["计划1"]}
+        pk = store.insert(1, data)
         assert pk is not None
         row = store.get_by_id(pk)
-        assert row is not None and row.raw_item_id == 1 and row.opportunities == ["opp1"]
+        assert row is not None and row.raw_item_id == 1 and row.data == data
         rows = store.list_since(limit=10)
         assert len(rows) >= 1
     finally:
