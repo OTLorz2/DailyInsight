@@ -21,3 +21,4 @@ delivery:
   plugins: [email]
   email:
     subject_prefix: "[AI 洞察]"
+    max_insights: 10   # 单封邮件最多包含的日报条数

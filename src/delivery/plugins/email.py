@@ -64,10 +64,11 @@ class EmailDeliveryPlugin(DeliveryPlugin):
         email_to_raw = os.getenv("EMAIL_TO") or config.get("email_to")
         recipients = _parse_recipients(email_to_raw)
         subject_prefix = config.get("subject_prefix", "[AI 洞察]")
+        max_insights = int(config.get("max_insights", 100))
         if not all([smtp_host, smtp_user, smtp_password]) or not recipients:
             logger.warning("Email plugin: missing SMTP_HOST/USER/PASSWORD or EMAIL_TO")
             return False
-        insights = insight_store.list_since(limit=100)
+        insights = insight_store.list_since(limit=max_insights)
         if not insights:
             logger.info("Email plugin: no insights to send")
             return True
