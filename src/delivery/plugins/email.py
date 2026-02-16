@@ -14,6 +14,15 @@ from src.delivery.interface import DeliveryPlugin
 logger = logging.getLogger(__name__)
 
 
+def _parse_recipients(raw: str | list[str] | None) -> list[str]:
+    """Parse EMAIL_TO / email_to into list of addresses (comma-separated string or list)."""
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [s.strip() for s in raw if s and s.strip()]
+    return [s.strip() for s in str(raw).split(",") if s.strip()]
+
+
 def _build_body(insights: list[Any], raw_store: Any | None = None) -> str:
     """Build plain text email body from insights."""
     lines = ["# AI 洞察 日报\n"]
@@ -52,9 +61,10 @@ class EmailDeliveryPlugin(DeliveryPlugin):
         smtp_user = os.getenv("SMTP_USER") or config.get("smtp_user")
         smtp_password = os.getenv("SMTP_PASSWORD") or config.get("smtp_password")
         smtp_from = os.getenv("SMTP_FROM") or config.get("smtp_from") or smtp_user
-        email_to = os.getenv("EMAIL_TO") or config.get("email_to")
+        email_to_raw = os.getenv("EMAIL_TO") or config.get("email_to")
+        recipients = _parse_recipients(email_to_raw)
         subject_prefix = config.get("subject_prefix", "[AI 洞察]")
-        if not all([smtp_host, smtp_user, smtp_password, email_to]):
+        if not all([smtp_host, smtp_user, smtp_password]) or not recipients:
             logger.warning("Email plugin: missing SMTP_HOST/USER/PASSWORD or EMAIL_TO")
             return False
         insights = insight_store.list_since(limit=100)
@@ -63,23 +73,31 @@ class EmailDeliveryPlugin(DeliveryPlugin):
             return True
         body = _build_body(insights, raw_store)
         subject = f"{subject_prefix} 日报 {len(insights)} 条"
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = smtp_from
-        msg["To"] = email_to
-        msg.attach(MIMEText(body, "plain", "utf-8"))
         use_ssl = smtp_port == 465
         try:
             if use_ssl:
                 with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
                     server.login(smtp_user, smtp_password)
-                    server.sendmail(smtp_from, [email_to], msg.as_string())
+                    for to in recipients:
+                        msg = MIMEMultipart("alternative")
+                        msg["Subject"] = subject
+                        msg["From"] = smtp_from
+                        msg["To"] = to
+                        msg.attach(MIMEText(body, "plain", "utf-8"))
+                        server.sendmail(smtp_from, [to], msg.as_string())
+                        logger.info("Email plugin: sent to %s", to)
             else:
                 with smtplib.SMTP(smtp_host, smtp_port) as server:
                     server.starttls()
                     server.login(smtp_user, smtp_password)
-                    server.sendmail(smtp_from, [email_to], msg.as_string())
-            logger.info("Email plugin: sent to %s", email_to)
+                    for to in recipients:
+                        msg = MIMEMultipart("alternative")
+                        msg["Subject"] = subject
+                        msg["From"] = smtp_from
+                        msg["To"] = to
+                        msg.attach(MIMEText(body, "plain", "utf-8"))
+                        server.sendmail(smtp_from, [to], msg.as_string())
+                        logger.info("Email plugin: sent to %s", to)
             return True
         except Exception as e:
             logger.exception("Email plugin: send failed: %s", e)
