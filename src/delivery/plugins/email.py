@@ -34,9 +34,9 @@ def _format_value(v: Any) -> str:
     return str(v) if v is not None else "-"
 
 
-def _build_body(insights: list[Any], raw_store: Any | None = None) -> str:
+def _build_body(insights: list[Any], raw_store: Any | None = None, topic_name: str = "洞察") -> str:
     """Build plain text email body from insights (flexible data structure)."""
-    lines = ["# AI 洞察 日报\n"]
+    lines = [f"# {topic_name} 日报\n"]
     for i, ins in enumerate(insights, 1):
         lines.append(f"## 条目 {i}\n")
         data = getattr(ins, "data", {}) or {}
@@ -68,6 +68,9 @@ class EmailDeliveryPlugin(DeliveryPlugin):
         config = config or {}
         context = context or {}
         raw_store = context.get("raw_store")
+        # Get topic configuration from context (passed from run_daily.py)
+        topic_config = context.get("topic") or {}
+        topic_name = topic_config.get("name", "洞察")
         smtp_host = os.getenv("SMTP_HOST") or config.get("smtp_host")
         smtp_port = int(os.getenv("SMTP_PORT", "587") or config.get("smtp_port", "587"))
         smtp_user = os.getenv("SMTP_USER") or config.get("smtp_user")
@@ -75,7 +78,13 @@ class EmailDeliveryPlugin(DeliveryPlugin):
         smtp_from = os.getenv("SMTP_FROM") or config.get("smtp_from") or smtp_user
         email_to_raw = os.getenv("EMAIL_TO") or config.get("email_to")
         recipients = _parse_recipients(email_to_raw)
-        subject_prefix = config.get("subject_prefix", "[AI 洞察]")
+        # Use config subject_prefix, but if it uses the default AI pattern, generate from topic
+        config_prefix = config.get("subject_prefix")
+        if config_prefix and config_prefix != "[AI 洞察]":
+            subject_prefix = config_prefix
+        else:
+            # Generate from topic_name
+            subject_prefix = f"[{topic_name}洞察]"
         max_insights = int(config.get("max_insights", 100))
         if not all([smtp_host, smtp_user, smtp_password]) or not recipients:
             logger.warning("Email plugin: missing SMTP_HOST/USER/PASSWORD or EMAIL_TO")
@@ -84,7 +93,7 @@ class EmailDeliveryPlugin(DeliveryPlugin):
         if not insights:
             logger.info("Email plugin: no insights to send")
             return True
-        body = _build_body(insights, raw_store)
+        body = _build_body(insights, raw_store, topic_name)
         subject = f"{subject_prefix} 日报 {len(insights)} 条"
         use_ssl = smtp_port == 465
         try:

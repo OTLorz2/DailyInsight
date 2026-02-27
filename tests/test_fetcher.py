@@ -18,12 +18,12 @@ def test_fetcher_arxiv_to_raw_store(mock_fetch):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
         store = RawStore(path)
-        counts = run_fetch(store, sources_config={"arxiv": {"enabled": True, "max_results": 10}})
+        counts = run_fetch(store, sources_config={"arxiv": {"enabled": True, "categories": ["cs.AI", "cs.LG", "cs.CL"], "max_results": 10}})
         assert counts.get("arxiv") == 2
         rows = store.list_since(limit=10)
         assert len(rows) == 2
         # dedup: run again, no new inserts
-        counts2 = run_fetch(store, sources_config={"arxiv": {"enabled": True}})
+        counts2 = run_fetch(store, sources_config={"arxiv": {"enabled": True, "categories": ["cs.AI", "cs.LG", "cs.CL"]}})
         assert counts2.get("arxiv") == 0
         rows2 = store.list_since(limit=10)
         assert len(rows2) == 2

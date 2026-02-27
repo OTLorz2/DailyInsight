@@ -15,7 +15,9 @@ from src.storage import RawStore, InsightStore
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """你是一名专业分析师。请根据每条信息的类型采用自适应的分析流程，根据内容自行组织输出结构。
+DEFAULT_FOCUS_AREAS = ["创新点", "应用场景", "商业模式"]
+
+DEFAULT_SYSTEM_PROMPT_TEMPLATE = """你是一名专业分析师。请根据每条信息的类型采用自适应的分析流程，根据内容自行组织输出结构。
 
 ## 分析流程示例
 
@@ -38,6 +40,37 @@ SYSTEM_PROMPT = """你是一名专业分析师。请根据每条信息的类型�
 ## 输出要求
 
 请仅回复一个 JSON 对象，键名使用中文，键和结构由你根据分析内容自行决定。值可以是字符串、字符串数组或嵌套对象。每条描述保持简洁（建议 80 字符以内）。"""
+
+
+def _build_system_prompt(focus_areas: list[str] | None = None) -> str:
+    """Build system prompt with optional focus areas for analysis.
+
+    If focus_areas is provided, they are highlighted to guide the LLM's analysis.
+    Otherwise, uses a general-purpose prompt suitable for any domain.
+    """
+    if not focus_areas:
+        return DEFAULT_SYSTEM_PROMPT_TEMPLATE
+
+    # Build focus areas guidance
+    focus_list = "、".join(focus_areas)
+    focus_guidance = f"""## 分析维度指引
+
+请重点关注以下分析维度：{focus_list}。
+
+在分析时，请围绕这些维度展开，但也可以根据内容的重要性灵活调整分析重点。
+用你认为合适的中文键名组织成 JSON（如：{focus_list} 等）。
+"""
+
+    # Combine base prompt with focus areas
+    base = DEFAULT_SYSTEM_PROMPT_TEMPLATE
+    # Replace the generic output requirement section with one that emphasizes focus areas
+    if "## 输出要求" in base:
+        # Insert focus guidance before output requirements
+        base = base.replace("## 输出要求", focus_guidance + "\n## 输出要求")
+    else:
+        base = base + "\n" + focus_guidance
+
+    return base
 
 
 def _parse_llm_response(text: str) -> dict[str, Any]:
@@ -77,14 +110,19 @@ def analyze_one(
     url: str,
     summary: str,
     summary_max_chars: int = 500,
+    focus_areas: list[str] | None = None,
 ) -> dict[str, Any]:
     """Call LLM for one raw item; return analysis as a dict (structure determined by model)."""
     summary_trim = (summary or "")[:summary_max_chars]
     user = f"Title: {title}\nURL: {url}\nAbstract/Summary: {summary_trim}"
+
+    # Build system prompt based on focus_areas if provided
+    system_prompt = _build_system_prompt(focus_areas)
+
     resp = client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user},
         ],
         temperature=0.3,
@@ -101,6 +139,7 @@ def run_analyze(
     summary_max_chars: int = 500,
     api_key: str | None = None,
     base_url: str | None = None,
+    focus_areas: list[str] | None = None,
 ) -> int:
     """
     Load raw items not yet analyzed, call LLM for each, write to InsightStore.
@@ -119,7 +158,7 @@ def run_analyze(
     for item in to_process:
         try:
             data = analyze_one(
-                client, model, item.title, item.url, item.summary, summary_max_chars
+                client, model, item.title, item.url, item.summary, summary_max_chars, focus_areas
             )
             insight_store.insert(item.id, data)
             count += 1

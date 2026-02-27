@@ -59,6 +59,7 @@ def main() -> None:
         model=analyzer_cfg.get("model"),
         max_items_per_run=analyzer_cfg.get("max_items_per_run", 30),
         summary_max_chars=analyzer_cfg.get("summary_max_chars", 500),
+        focus_areas=analyzer_cfg.get("focus_areas"),
     )
     logger.info("Analyzed %d new items", n_analyzed)
 
@@ -66,7 +67,9 @@ def main() -> None:
     delivery_cfg = config.get("delivery") or {}
     plugin_ids = delivery_cfg.get("plugins") or []
     plugins = load_plugins_from_config(plugin_ids)
-    context = {"raw_store": raw_store}
+    # Pass topic config to plugins via context for dynamic subject/title generation
+    topic_cfg = config.get("topic") or {}
+    context = {"raw_store": raw_store, "topic": topic_cfg}
     for p in plugins:
         plugin_config = delivery_cfg.get(p.plugin_id) or {}
         ok = p.deliver(insight_store, config=plugin_config, context=context)

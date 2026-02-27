@@ -1,5 +1,5 @@
 """
-arXiv source adapter: fetch recent papers from cs.AI, cs.LG, cs.CL via API.
+arXiv source adapter: fetch recent papers from specified arXiv categories via API.
 Returns list of dicts with title, url, summary for RawStore contract.
 """
 import ssl
@@ -25,11 +25,11 @@ def fetch_arxiv(
     max_results: int = 50,
 ) -> list[dict[str, Any]]:
     """
-    Fetch recent papers from arXiv. Categories default to cs.AI, cs.LG, cs.CL.
+    Fetch recent papers from arXiv. Categories must be provided.
     Returns list of {"title", "url", "summary"}.
     """
-    if categories is None:
-        categories = ["cs.AI", "cs.LG", "cs.CL"]
+    if categories is None or not categories:
+        raise ValueError("categories must be provided and non-empty")
     # Use " OR " with spaces so urlencode encodes spaces as +; API expects spaces around OR (parentheses per arXiv manual).
     query = "(" + " OR ".join(f"cat:{c}" for c in categories) + ")"
     url = (

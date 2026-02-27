@@ -27,7 +27,13 @@ def run_fetch(
     # arXiv
     arxiv_cfg = sources_config.get("arxiv") or {}
     if arxiv_cfg.get("enabled", True):
-        categories = arxiv_cfg.get("categories") or ["cs.AI", "cs.LG", "cs.CL"]
+        categories = arxiv_cfg.get("categories")
+        if not categories:
+            raise ValueError(
+                "arxiv.categories must be configured and non-empty. "
+                "Example: ['cs.AI', 'cs.LG', 'cs.CL'] for AI papers, "
+                "or ['physics.quant-ph'] for quantum physics papers."
+            )
         max_results = arxiv_cfg.get("max_results", 50)
         try:
             items = fetch_arxiv(categories=categories, max_results=max_results)

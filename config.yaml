@@ -1,5 +1,11 @@
 # Insight-mode config
 # Data sources (current: arxiv only)
+
+# Topic configuration (NEW: configurable topic for insights)
+topic:
+  name: "人工智能"              # Topic name, used in email titles
+  description: "AI/ML Research" # Topic description, used for logging
+
 sources:
   arxiv:
     enabled: true
@@ -15,10 +21,16 @@ analyzer:
   model: qwen3:8b
   max_items_per_run: 30
   summary_max_chars: 5000
+  # NEW: customizable focus areas for analysis
+  focus_areas:
+    - "创新点"
+    - "应用场景"
+    - "商业模式"
 
 # Delivery plugins (current: email only)
 delivery:
   plugins: [email]
   email:
-    subject_prefix: "[AI 洞察]"
+    # subject_prefix now auto-generated from topic.name: "[{{topic.name}}洞察]"
+    subject_prefix: "[人工智能洞察]"
     max_insights: 10   # 单封邮件最多包含的日报条数
