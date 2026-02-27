@@ -25,41 +25,45 @@ class DiscordDeliveryPlugin(DeliveryPlugin):
             {
                 "title": f"{topic_name} 日报",
                 "description": f"今日共 **{len(insights)}** 条洞察",
-                "color": 0x00BFFF,  # Deep sky blue
+                "color": 0x5865F2,  # Discord blurple
                 "footer": {
                     "text": "insight-mode daily digest"
-                }
+                },
+                "timestamp": None  # Will be set to current time
             }
         ]
         
-        # Add up to 10 insight embeds (Discord limit is 10 embeds per message)
-        for i, ins in enumerate(insights[:10], 1):
+        # Add up to 9 more insight embeds (Discord limit is 10 total)
+        for i, ins in enumerate(insights[:9], 1):
             data = getattr(ins, "data", {}) or {}
+            
+            # Get title from data
+            title = data.get("标题", data.get("title", data.get("Title", f"条目 {i}")))
             
             # Build description from data
             desc_parts = []
             for key, value in data.items():
-                if key.lower() in ["链接", "url", "link"]:
+                if key in ["标题", "title", "Title"]:
                     continue
                 if isinstance(value, str):
-                    desc_parts.append(f"**{key}**: {value[:150]}")
+                    desc_parts.append(f"**{key}**: {value[:200]}")
                 elif isinstance(value, list):
                     list_str = ", ".join(str(v) for v in value[:3])
                     desc_parts.append(f"**{key}**: {list_str}")
             
-            description = "\n".join(desc_parts) if desc_parts else "详见详情"
+            description = "\n".join(desc_parts[:5]) if desc_parts else "详见详情"  # Limit fields
             
             embeds.append({
-                "title": f"条目 {i}",
-                "description": description,
-                "color": 0x7289DA,  # Discord blurple
+                "title": title[:256] if title else f"条目 {i}",  # Discord title limit
+                "description": description[:2048] if description else "No details",  # Discord desc limit
+                "color": 0x7289DA,  # Light blue
             })
         
-        if len(insights) > 10:
+        if len(insights) > 9:
             embeds.append({
                 "title": "更多洞察",
-                "description": f"_还有 {len(insights) - 10} 条洞察未显示_",
-                "color": 0x99AAB5,  # Discord grey
+                "description": f"_还有 {len(insights) - 9} 条洞察未显示_",
+                "color": 0x99AAB5,  # Grey
             })
         
         return embeds
@@ -92,13 +96,21 @@ class DiscordDeliveryPlugin(DeliveryPlugin):
             logger.info("Discord plugin: no insights to send")
             return True
         
-        # Build payload
+        # Build embeds
         embeds = self._format_embeds(insights, topic_name)
         
+        # Build payload
+        from datetime import datetime, timezone
         payload = {
             "content": None,
-            "embeds": embeds
+            "embeds": embeds,
+            "username": "Insight Mode",
+            "avatar_url": "https://cdn.discordapp.com/embed/avatars/0.png"
         }
+        
+        # Add timestamp to first embed
+        if embeds:
+            embeds[0]["timestamp"] = datetime.now(timezone.utc).isoformat()
         
         # Send to Discord
         try:
