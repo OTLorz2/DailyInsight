@@ -4,7 +4,6 @@ Returns list of dicts with title, url, summary for RawStore contract.
 """
 import ssl
 import urllib.request
-import urllib.parse
 import json
 from typing import Any
 
@@ -26,10 +25,6 @@ def fetch_biorxiv(
     
     Returns list of {"title", "url", "summary"}.
     """
-    # bioRxiv API endpoint for recent preprints
-    base_url = "https://api.biorxiv.org/covid19/0"  # Using covid19 endpoint as example
-    # For general preprints, use: https://api.biorxiv.org/details/biorxiv/yyyy-mm/dd/ntd_doi
-    
     # Using the details endpoint to get recent preprints
     url = f"https://api.biorxiv.org/details/biorxiv/0/{max_results}"
     
