@@ -1,5 +1,5 @@
 # Insight-mode config
-# Data sources (current: arxiv only)
+# Data sources: arxiv, biorxiv, medrxiv, semantic_scholar
 
 # Topic configuration (NEW: configurable topic for insights)
 topic:
@@ -11,6 +11,26 @@ sources:
     enabled: true
     categories: ["cs.AI", "cs.LG", "cs.CL"]
     max_results: 30
+  
+  # bioRxiv - biology preprints (disabled by default)
+  biorxiv:
+    enabled: false
+    categories: []  # bioRxiv doesn't support category filtering via API
+    max_results: 20
+  
+  # medRxiv - medical preprints (disabled by default)
+  medrxiv:
+    enabled: false
+    categories: []  # medRxiv doesn't support category filtering via API
+    max_results: 20
+  
+  # Semantic Scholar - academic search (disabled by default)
+  semantic_scholar:
+    enabled: false
+    categories: ["Computer Science", "Machine Learning"]
+    max_results: 20
+    query: "machine learning OR artificial intelligence"
+    # Optional: Set SEMANTIC_SCHOLAR_API_KEY in .env for higher rate limits
 
 # Storage
 storage:
@@ -27,10 +47,34 @@ analyzer:
     - "应用场景"
     - "商业模式"
 
-# Delivery plugins (current: email only)
+# Delivery plugins
+# Available plugins: email, slack, discord, rss
 delivery:
   plugins: [email]
+  
   email:
     # subject_prefix now auto-generated from topic.name: "[{{topic.name}}洞察]"
     subject_prefix: "[人工智能洞察]"
     max_insights: 10   # 单封邮件最多包含的日报条数
+    # SMTP configuration should be set in .env file:
+    # SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, EMAIL_TO
+  
+  # Slack integration (disabled by default)
+  # To enable: add "slack" to plugins list and configure webhook_url
+  slack:
+    webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+    max_insights: 20   # Slack messages have a limit, keep this reasonable
+  
+  # Discord integration (disabled by default)
+  # To enable: add "discord" to plugins list and configure webhook_url
+  discord:
+    webhook_url: "https://discord.com/api/webhooks/YOUR/WEBHOOK/TOKEN"
+    max_insights: 10   # Discord embed limits are strict
+  
+  # RSS Feed generation (disabled by default)
+  # To enable: add "rss" to plugins list
+  # This generates a static RSS file that can be served by a web server
+  rss:
+    output_path: "public/rss.xml"  # Path to write the RSS file
+    feed_url: "https://example.com/rss.xml"  # Public URL where the feed will be accessible
+    max_insights: 50  # Number of recent insights to include in the feed
